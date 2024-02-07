@@ -18,3 +18,9 @@ class Settings:
         self.bullet_height = 15
         self.bullet_color = (230, 108, 58)
         self.bullets_allowed = 3
+
+        # Configurações da galinha
+        self.chicken_speed = 1.0
+        self.fleet_drop_speed = 10
+        # fleet_direction de 1 representa a direita; -1, esquerda
+        self.fleet_direction = 1
