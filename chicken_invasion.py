@@ -1,7 +1,10 @@
 import sys
+from time import sleep
+
 import pygame
 
 from settings import Settings
+from game_stats import GameStats
 from ship import Ship
 from bullet import Bullet
 from chicken import Chicken
@@ -22,6 +25,9 @@ class ChickenInvasion:
             (self.settings.screen_width, self.settings.screen_height)
             )
         pygame.display.set_caption("Chicken Invasion")
+
+        # Cria uma instância para armazenar estatísticas do jogo
+        self.stats = GameStats(self)
         
         # Define a cor do background
         self.bg_color = self.settings.bg_color
@@ -32,15 +38,21 @@ class ChickenInvasion:
 
         self._create_fleet()
 
+        # Inicializa o game em um estado ativo
+        self.game_active = True
+
     
     def run_game(self):
         """Inicia o loop principal do jogo"""
         
         while True:
             self._check_events()
-            self.ship.update()
-            self._update_bullets()
-            self._update_chickens()
+
+            if self.game_active:
+                self.ship.update()
+                self._update_bullets()
+                self._update_chickens()
+
             self._update_screen()
             self.clock.tick(60)
             
@@ -101,16 +113,72 @@ class ChickenInvasion:
         for bullet in self.bullets.copy():
             if bullet.rect.bottom <= 0:
                 self.bullets.remove(bullet)
+        
+        self._check_bullet_chicken_collisions()
+
+    
+    def _check_bullet_chicken_collisions(self):
+        """Responde à colisões"""
+
+        # Remove todos os projéteis e galinhas que tenham colidido
+        collision = pygame.sprite.groupcollide(
+            self.bullets, self.chickens, True, True
+        )
+
+        if not self.chickens:
+            # Destrói os projéteis existentes e cria uma nova frota
+            self.bullets.empty()
+            self._create_fleet()
 
     
     def _update_chickens(self):
         """Verifica se a frota está na borda e atualiza as posições"""
+
         self._check_fleet_edges()
         self.chickens.update()
+
+        # Detecta colisões entre galinhas e espaçonaves
+        if pygame.sprite.spritecollideany(self.ship, self.chickens):
+            self._ship_hit()
+        
+        # Procura por galinhas se chocando contra a parte inferior da tela
+        self._check_chickens_bottom()
+
+    
+    def _check_chickens_bottom(self):
+        """Verifica se alguma galinha chegou à parte inferior da tela"""
+
+        for chicken in self.chickens.sprites():
+            if chicken.rect.bottom >= self.settings.screen_height:
+                # Trata isso como se a espaçonave tivesse sido abatida
+                self._ship_hit()
+                break
+
+    
+    def _ship_hit(self):
+        """Responde à espaçonave sendo abatida por uma galinha"""
+
+        if self.stats.ships_left > 0:
+            # Decrementa ships_left
+            self.stats.ships_left -= 1
+
+            # Descarta quaisquer projéteis e galinhas restantes
+            self.bullets.empty()
+            self.chickens.empty()
+
+            # Cria uma nova frota e centraliza espaçonave
+            self._create_fleet()
+            self.ship.center_ship()
+
+            # Pausa
+            sleep(0.5)
+        else:
+            self.game_active = False
 
 
     def _create_fleet(self):
         """Cria a frota de galinhas"""
+
         # Cria galinha e continua adicionando até limite de tela
         # O distanciamento entre galinhas é a largura e altura de uma
         chicken = Chicken(self)
@@ -130,6 +198,7 @@ class ChickenInvasion:
 
     def _create_chicken(self, x_position, y_position):
         """Cria uma galinha e a posiciona na frota"""
+
         new_chicken = Chicken(self)
         new_chicken.x = x_position
         new_chicken.rect.x = x_position
@@ -139,6 +208,7 @@ class ChickenInvasion:
     
     def _check_fleet_edges(self):
         """Responde apropriadamente se alguma galinha alcançou a borda"""
+
         for chicken in self.chickens.sprites():
             if chicken.check_edges():
                 self._change_fleet_direction()
@@ -147,6 +217,7 @@ class ChickenInvasion:
 
     def _change_fleet_direction(self):
         """Faz toda a frota descer e mudar de direção"""
+
         for chicken in self.chickens.sprites():
             chicken.rect.y += self.settings.fleet_drop_speed
         self.settings.fleet_direction *= -1
@@ -154,6 +225,7 @@ class ChickenInvasion:
 
     def _update_screen(self):
         """Atualiza as imagens na tela e muda para a nova tela"""
+
         self.screen.fill(self.bg_color)
 
         for bullet in self.bullets.sprites():
